@@ -244,6 +244,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     private final static int share_contact = 13;
     private final static int mute = 14;
     private final static int reply = 15;
+    private final static int create_shortcut = 16;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -775,7 +776,12 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                         builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
                         showAlertDialog(builder);
                     }
-                } else if (id == mute) {
+                } else if (id == create_shortcut)
+                {
+                    Utilities.addShortcut(getParentActivity());
+                    Toast.makeText(getParentActivity(), "create_shortcut", Toast.LENGTH_LONG).show();
+                }
+                else if (id == mute) {
                     boolean muted = MessagesController.getInstance().isDialogMuted(dialog_id);
                     if (!muted) {
                         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
@@ -982,6 +988,8 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             headerItem.addSubItem(delete_chat, LocaleController.getString("DeleteChatUser", R.string.DeleteChatUser), 0);
         }
         muteItem = headerItem.addSubItem(mute, null, 0);
+
+        headerItem.addSubItem(create_shortcut, "Create shortcut", 0);
 
         LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) headerItem.getLayoutParams();
         layoutParams.rightMargin = AndroidUtilities.dp(-48);

@@ -29,6 +29,7 @@ import net.hockeyapp.android.CrashManagerListener;
 import net.hockeyapp.android.UpdateManager;
 
 import org.telegram.android.AndroidUtilities;
+import org.telegram.ui.LaunchActivity;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -770,5 +771,21 @@ public class Utilities {
         if (BuildVars.DEBUG_VERSION) {
             UpdateManager.register(context, BuildVars.HOCKEY_APP_HASH);
         }
+    }
+
+    public static void addShortcut(Activity context) {
+        //Adding shortcut for MainActivity
+        //on Home screen
+        Intent shortcutIntent = new Intent(context, LaunchActivity.class);
+
+        shortcutIntent.setAction(Intent.ACTION_MAIN);
+
+        Intent addIntent = new Intent();
+        addIntent.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
+        addIntent.putExtra(Intent.EXTRA_SHORTCUT_NAME, "HelloWorldShortcut");
+        addIntent.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE, Intent.ShortcutIconResource.fromContext(context, R.drawable.ic_launcher));
+
+        addIntent.setAction("com.android.launcher.action.INSTALL_SHORTCUT");
+        context.sendBroadcast(addIntent);
     }
 }
