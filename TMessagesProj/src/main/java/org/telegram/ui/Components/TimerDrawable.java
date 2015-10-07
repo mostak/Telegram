@@ -17,7 +17,7 @@ import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 
-import org.telegram.android.AndroidUtilities;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 
@@ -45,7 +45,7 @@ public class TimerDrawable extends Drawable {
     public void setTime(int value) {
         time = value;
 
-        String timeString = null;
+        String timeString;
         if (time >= 1 && time < 60) {
             timeString = "" + value;
             if (timeString.length() < 2) {
@@ -91,7 +91,7 @@ public class TimerDrawable extends Drawable {
     public void draw(Canvas canvas) {
         int width = timerDrawable.getIntrinsicWidth();
         int height = timerDrawable.getIntrinsicHeight();
-        Drawable drawable = null;
+        Drawable drawable;
         if (time == 0) {
             drawable = timerDrawable;
         } else {

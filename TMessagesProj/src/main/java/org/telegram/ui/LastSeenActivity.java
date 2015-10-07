@@ -18,7 +18,6 @@ import android.os.Bundle;
 import android.text.Spannable;
 import android.text.method.LinkMovementMethod;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,18 +26,18 @@ import android.widget.FrameLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
-import org.telegram.android.AndroidUtilities;
-import org.telegram.android.ContactsController;
-import org.telegram.android.LocaleController;
-import org.telegram.android.MessagesController;
-import org.telegram.android.NotificationCenter;
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.ConnectionsManager;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
-import org.telegram.messenger.RPCRequest;
-import org.telegram.messenger.TLObject;
-import org.telegram.messenger.TLRPC;
+import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.RequestDelegate;
+import org.telegram.tgnet.TLObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -46,6 +45,7 @@ import org.telegram.ui.Adapters.BaseFragmentAdapter;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
+import org.telegram.ui.Components.LayoutHelper;
 
 import java.util.ArrayList;
 
@@ -99,7 +99,7 @@ public class LastSeenActivity extends BaseFragment implements NotificationCenter
     }
 
     @Override
-    public View createView(Context context, LayoutInflater inflater) {
+    public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(LocaleController.getString("PrivacyLastSeen", R.string.PrivacyLastSeen));
@@ -128,7 +128,7 @@ public class LastSeenActivity extends BaseFragment implements NotificationCenter
                                 }
                             });
                             builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
-                            showAlertDialog(builder);
+                            showDialog(builder.create());
                             return;
                         }
                     }
@@ -154,8 +154,8 @@ public class LastSeenActivity extends BaseFragment implements NotificationCenter
         listView.setDrawSelectorOnTop(true);
         frameLayout.addView(listView);
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) listView.getLayoutParams();
-        layoutParams.width = FrameLayout.LayoutParams.MATCH_PARENT;
-        layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT;
+        layoutParams.width = LayoutHelper.MATCH_PARENT;
+        layoutParams.height = LayoutHelper.MATCH_PARENT;
         layoutParams.gravity = Gravity.TOP;
         listView.setLayoutParams(layoutParams);
         listView.setAdapter(listAdapter);
@@ -178,7 +178,7 @@ public class LastSeenActivity extends BaseFragment implements NotificationCenter
                     currentType = newType;
                     updateRows();
                 } else if (i == neverShareRow || i == alwaysShareRow) {
-                    ArrayList<Integer> createFromArray = null;
+                    ArrayList<Integer> createFromArray;
                     if (i == neverShareRow) {
                         createFromArray = currentMinus;
                     } else {
@@ -289,7 +289,7 @@ public class LastSeenActivity extends BaseFragment implements NotificationCenter
         progressDialog.setCancelable(false);
         progressDialog.show();
 
-        ConnectionsManager.getInstance().performRpc(req, new RPCRequest.RPCRequestDelegate() {
+        ConnectionsManager.getInstance().sendRequest(req, new RequestDelegate() {
             @Override
             public void run(final TLObject response, final TLRPC.TL_error error) {
                 AndroidUtilities.runOnUIThread(new Runnable() {
@@ -311,7 +311,7 @@ public class LastSeenActivity extends BaseFragment implements NotificationCenter
                     }
                 });
             }
-        }, true, RPCRequest.RPCRequestClassGeneric | RPCRequest.RPCRequestClassFailOnServerErrors);
+        }, ConnectionsManager.RequestFlagFailOnServerErrors);
     }
 
     private void showErrorAlert() {
@@ -322,7 +322,7 @@ public class LastSeenActivity extends BaseFragment implements NotificationCenter
         builder.setTitle(LocaleController.getString("AppName", R.string.AppName));
         builder.setMessage(LocaleController.getString("PrivacyFloodControlError", R.string.PrivacyFloodControlError));
         builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), null);
-        showAlertDialog(builder);
+        showDialog(builder.create());
     }
 
     private void checkPrivacy() {

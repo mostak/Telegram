@@ -12,7 +12,7 @@ import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
 
-import org.telegram.android.AndroidUtilities;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.Adapters.CountryAdapter.Country;
@@ -72,7 +72,6 @@ public class CountrySearchAdapter extends BaseFragmentAdapter {
                     updateSearchResults(new ArrayList<Country>());
                     return;
                 }
-                long time = System.currentTimeMillis();
                 ArrayList<Country> resultArray = new ArrayList<>();
 
                 String n = query.substring(0, 1);

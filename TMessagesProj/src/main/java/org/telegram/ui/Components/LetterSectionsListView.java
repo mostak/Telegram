@@ -17,8 +17,8 @@ import android.widget.AbsListView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 
-import org.telegram.android.AndroidUtilities;
-import org.telegram.android.LocaleController;
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.FileLog;
 import org.telegram.ui.Adapters.BaseSectionsAdapter;
 
@@ -113,7 +113,7 @@ public class LetterSectionsListView extends ListView implements AbsListView.OnSc
                     header.setTag(-header.getHeight());
                 } else if (pos == count - 2) {
                     View child = getChildAt(itemNum - firstVisibleItem);
-                    int headerTop = 0;
+                    int headerTop;
                     if (child != null) {
                         headerTop = child.getTop();
                     } else {

@@ -12,24 +12,22 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.FrameLayout;
 import android.widget.ListView;
 
-import org.telegram.android.AndroidUtilities;
-import org.telegram.android.ContactsController;
-import org.telegram.android.LocaleController;
-import org.telegram.android.NotificationCenter;
-import org.telegram.messenger.ConnectionsManager;
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
-import org.telegram.messenger.RPCRequest;
-import org.telegram.messenger.TLObject;
-import org.telegram.messenger.TLRPC;
+import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.RequestDelegate;
+import org.telegram.tgnet.TLObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -37,6 +35,7 @@ import org.telegram.ui.Adapters.BaseFragmentAdapter;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
+import org.telegram.ui.Components.LayoutHelper;
 
 import java.util.ArrayList;
 
@@ -90,7 +89,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
     }
 
     @Override
-    public View createView(Context context, LayoutInflater inflater) {
+    public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(LocaleController.getString("PrivacySettings", R.string.PrivacySettings));
@@ -114,12 +113,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
         listView.setDividerHeight(0);
         listView.setVerticalScrollBarEnabled(false);
         listView.setDrawSelectorOnTop(true);
-        frameLayout.addView(listView);
-        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) listView.getLayoutParams();
-        layoutParams.width = FrameLayout.LayoutParams.MATCH_PARENT;
-        layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT;
-        layoutParams.gravity = Gravity.TOP;
-        listView.setLayoutParams(layoutParams);
+        frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         listView.setAdapter(listAdapter);
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -161,7 +155,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                             final TLRPC.TL_account_setAccountTTL req = new TLRPC.TL_account_setAccountTTL();
                             req.ttl = new TLRPC.TL_accountDaysTTL();
                             req.ttl.days = value;
-                            ConnectionsManager.getInstance().performRpc(req, new RPCRequest.RPCRequestDelegate() {
+                            ConnectionsManager.getInstance().sendRequest(req, new RequestDelegate() {
                                 @Override
                                 public void run(final TLObject response, final TLRPC.TL_error error) {
                                     AndroidUtilities.runOnUIThread(new Runnable() {
@@ -183,7 +177,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                         }
                     });
                     builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
-                    showAlertDialog(builder);
+                    showDialog(builder.create());
                 } else if (i == lastSeenRow) {
                     presentFragment(new LastSeenActivity());
                 } else if (i == passwordRow) {
@@ -245,11 +239,11 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                     return LocaleController.formatString("LastSeenContactsMinusPlus", R.string.LastSeenContactsMinusPlus, minus, plus);
                 } else if (minus != 0) {
                     return LocaleController.formatString("LastSeenContactsMinus", R.string.LastSeenContactsMinus, minus);
-                } else if (plus != 0) {
+                } else {
                     return LocaleController.formatString("LastSeenContactsPlus", R.string.LastSeenContactsPlus, plus);
                 }
             }
-        } else if (type == 1 || type == -1 && plus > 0) {
+        } else if (type == 1 || plus > 0) {
             if (plus == 0) {
                 return LocaleController.getString("LastSeenNobody", R.string.LastSeenNobody);
             } else {

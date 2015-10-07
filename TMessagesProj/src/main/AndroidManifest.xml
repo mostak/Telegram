@@ -124,13 +124,25 @@
             android:windowSoftInputMode="adjustResize|stateHidden">
         </activity>
 
-        <receiver android:name="org.telegram.android.SmsListener">
+        <receiver android:name=".AutoMessageHeardReceiver">
+            <intent-filter>
+                <action android:name="org.telegram.messenger.ACTION_MESSAGE_HEARD"/>
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".AutoMessageReplyReceiver">
+            <intent-filter>
+                <action android:name="org.telegram.messenger.ACTION_MESSAGE_REPLY"/>
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".SmsListener">
             <intent-filter>
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
 
-        <service android:name="org.telegram.android.AuthenticatorService" android:exported="true">
+        <service android:name=".AuthenticatorService" android:exported="true">
             <intent-filter>
                 <action android:name="android.accounts.AccountAuthenticator"/>
             </intent-filter>
@@ -138,7 +150,7 @@
                 android:resource="@xml/auth"/>
         </service>
 
-        <service android:name="org.telegram.android.ContactsSyncAdapterService" android:exported="true">
+        <service android:name=".ContactsSyncAdapterService" android:exported="true">
             <intent-filter>
                 <action android:name="android.content.SyncAdapter" />
             </intent-filter>
@@ -148,19 +160,31 @@
                 android:resource="@xml/contacts" />
         </service>
 
-        <service android:name="org.telegram.android.NotificationsService" android:enabled="true"/>
-        <service android:name="org.telegram.android.NotificationRepeat" android:exported="false"/>
-        <service android:name="org.telegram.android.NotificationDelay" android:exported="false"/>
-        <service android:name="org.telegram.android.VideoEncodingService" android:enabled="true"/>
+        <service android:name=".NotificationsService" android:enabled="true"/>
+        <service android:name=".NotificationRepeat" android:exported="false"/>
+        <service android:name=".VideoEncodingService" android:enabled="true"/>
+        <service android:name=".MusicPlayerService" android:exported="true" android:enabled="true"/>
 
-        <receiver android:name="org.telegram.android.AppStartReceiver" android:enabled="true">
+        <receiver android:name=".MusicPlayerReceiver" >
+            <intent-filter>
+                <action android:name="org.telegram.android.musicplayer.close" />
+                <action android:name="org.telegram.android.musicplayer.pause" />
+                <action android:name="org.telegram.android.musicplayer.next" />
+                <action android:name="org.telegram.android.musicplayer.play" />
+                <action android:name="org.telegram.android.musicplayer.previous" />
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+                <action android:name="android.media.AUDIO_BECOMING_NOISY" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".AppStartReceiver" android:enabled="true">
             <intent-filter>
                 <action android:name="org.telegram.start" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
-        <receiver android:name="org.telegram.android.WearReplyReceiver" android:enabled="true"/>
+        <receiver android:name=".WearReplyReceiver" android:enabled="true"/>
 
         <uses-library android:name="com.sec.android.app.multiwindow" android:required="false" />
         <meta-data android:name="com.sec.android.support.multiwindow" android:value="true" />
@@ -168,6 +192,8 @@
         <meta-data android:name="com.sec.android.multiwindow.DEFAULT_SIZE_H" android:value="598dp" />
         <meta-data android:name="com.sec.android.multiwindow.MINIMUM_SIZE_W" android:value="632dp" />
         <meta-data android:name="com.sec.android.multiwindow.MINIMUM_SIZE_H" android:value="598dp" />
+
+        <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
 
     </application>
 

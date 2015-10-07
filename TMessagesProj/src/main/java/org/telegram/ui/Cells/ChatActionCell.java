@@ -21,16 +21,16 @@ import android.text.style.URLSpan;
 import android.view.MotionEvent;
 import android.view.SoundEffectConstants;
 
-import org.telegram.android.AndroidUtilities;
-import org.telegram.android.ImageReceiver;
-import org.telegram.android.MessageObject;
-import org.telegram.android.MessagesController;
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
-import org.telegram.messenger.R;
-import org.telegram.messenger.TLRPC;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.UserConfig;
+import org.telegram.ui.Components.ResourceLoader;
 import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.Components.AvatarDrawable;
 
@@ -42,8 +42,6 @@ public class ChatActionCell extends BaseCell {
         void needOpenUserProfile(int uid);
     }
 
-    private static Drawable backgroundBlack;
-    private static Drawable backgroundBlue;
     private static TextPaint textPaint;
 
     private URLSpan pressedLink;
@@ -65,10 +63,7 @@ public class ChatActionCell extends BaseCell {
 
     public ChatActionCell(Context context) {
         super(context);
-        if (backgroundBlack == null) {
-            backgroundBlack = getResources().getDrawable(R.drawable.system_black);
-            backgroundBlue = getResources().getDrawable(R.drawable.system_blue);
-
+        if (textPaint == null) {
             textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
             textPaint.setColor(0xffffffff);
             textPaint.linkColor = 0xffffffff;
@@ -94,6 +89,8 @@ public class ChatActionCell extends BaseCell {
             if (messageObject.messageOwner.to_id != null) {
                 if (messageObject.messageOwner.to_id.chat_id != 0) {
                     id = messageObject.messageOwner.to_id.chat_id;
+                } else if (messageObject.messageOwner.to_id.channel_id != 0) {
+                    id = messageObject.messageOwner.to_id.channel_id;
                 } else {
                     id = messageObject.messageOwner.to_id.user_id;
                     if (id == UserConfig.getClientUserId()) {
@@ -103,11 +100,11 @@ public class ChatActionCell extends BaseCell {
             }
             avatarDrawable.setInfo(id, null, null, false);
             if (currentMessageObject.messageOwner.action instanceof TLRPC.TL_messageActionUserUpdatedPhoto) {
-                imageReceiver.setImage(currentMessageObject.messageOwner.action.newUserPhoto.photo_small, "50_50", avatarDrawable, false);
+                imageReceiver.setImage(currentMessageObject.messageOwner.action.newUserPhoto.photo_small, "50_50", avatarDrawable, null, false);
             } else {
                 TLRPC.PhotoSize photo = FileLoader.getClosestPhotoSizeWithSize(currentMessageObject.photoThumbs, AndroidUtilities.dp(64));
                 if (photo != null) {
-                    imageReceiver.setImage(photo.location, "50_50", avatarDrawable, false);
+                    imageReceiver.setImage(photo.location, "50_50", avatarDrawable, null, false);
                 } else {
                     imageReceiver.setImageBitmap(avatarDrawable);
                 }
@@ -179,8 +176,8 @@ public class ChatActionCell extends BaseCell {
                     final int line = textLayout.getLineForVertical((int)y);
                     final int off = textLayout.getOffsetForHorizontal(line, x);
                     final float left = textLayout.getLineLeft(line);
-                    if (left <= x && left + textLayout.getLineWidth(line) >= x) {
-                        Spannable buffer = (Spannable)currentMessageObject.messageText;
+                    if (left <= x && left + textLayout.getLineWidth(line) >= x && currentMessageObject.messageText instanceof Spannable) {
+                        Spannable buffer = (Spannable) currentMessageObject.messageText;
                         URLSpan[] link = buffer.getSpans(off, off, URLSpan.class);
 
                         if (link.length != 0) {
@@ -230,8 +227,7 @@ public class ChatActionCell extends BaseCell {
             try {
                 int linesCount = textLayout.getLineCount();
                 for (int a = 0; a < linesCount; a++) {
-                    float lineWidth = 0;
-                    float lineLeft = 0;
+                    float lineWidth;
                     try {
                         lineWidth = textLayout.getLineWidth(a);
                         textHeight = (int)Math.max(textHeight, Math.ceil(textLayout.getLineBottom(a)));
@@ -262,11 +258,11 @@ public class ChatActionCell extends BaseCell {
             return;
         }
 
-        Drawable backgroundDrawable = null;
+        Drawable backgroundDrawable;
         if (ApplicationLoader.isCustomTheme()) {
-            backgroundDrawable = backgroundBlack;
+            backgroundDrawable = ResourceLoader.backgroundBlack;
         } else {
-            backgroundDrawable = backgroundBlue;
+            backgroundDrawable = ResourceLoader.backgroundBlue;
         }
         backgroundDrawable.setBounds(textX - AndroidUtilities.dp(5), AndroidUtilities.dp(5), textX + textWidth + AndroidUtilities.dp(5), AndroidUtilities.dp(9) + textHeight);
         backgroundDrawable.draw(canvas);

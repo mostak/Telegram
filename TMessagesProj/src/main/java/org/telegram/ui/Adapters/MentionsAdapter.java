@@ -12,9 +12,10 @@ import android.content.Context;
 import android.view.View;
 import android.view.ViewGroup;
 
-import org.telegram.android.MessageObject;
-import org.telegram.android.MessagesController;
-import org.telegram.messenger.TLRPC;
+import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.UserObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Cells.MentionCell;
 
 import java.util.ArrayList;
@@ -29,23 +30,30 @@ public class MentionsAdapter extends BaseSearchAdapter {
     }
 
     private Context mContext;
-    private TLRPC.ChatParticipants info;
+    private TLRPC.ChatFull info;
     private ArrayList<TLRPC.User> searchResultUsernames;
     private ArrayList<String> searchResultHashtags;
+    private ArrayList<String> searchResultCommands;
+    private ArrayList<String> searchResultCommandsHelp;
+    private ArrayList<TLRPC.User> searchResultCommandsUsers;
     private MentionsAdapterDelegate delegate;
+    private HashMap<Integer, TLRPC.BotInfo> botInfo;
     private int resultStartPosition;
     private int resultLength;
     private String lastText;
     private int lastPosition;
     private ArrayList<MessageObject> messages;
     private boolean needUsernames = true;
+    private boolean isDarkTheme;
+    private int botsCount;
 
-    public MentionsAdapter(Context context, MentionsAdapterDelegate delegate) {
+    public MentionsAdapter(Context context, boolean isDarkTheme, MentionsAdapterDelegate delegate) {
         mContext = context;
         this.delegate = delegate;
+        this.isDarkTheme = isDarkTheme;
     }
 
-    public void setChatInfo(TLRPC.ChatParticipants chatParticipants) {
+    public void setChatInfo(TLRPC.ChatFull chatParticipants) {
         info = chatParticipants;
         if (lastText != null) {
             searchUsernameOrHashtag(lastText, lastPosition, messages);
@@ -54,6 +62,14 @@ public class MentionsAdapter extends BaseSearchAdapter {
 
     public void setNeedUsernames(boolean value) {
         needUsernames = value;
+    }
+
+    public void setBotInfo(HashMap<Integer, TLRPC.BotInfo> info) {
+        botInfo = info;
+    }
+
+    public void setBotsCount(int count) {
+        botsCount = count;
     }
 
     @Override
@@ -124,6 +140,11 @@ public class MentionsAdapter extends BaseSearchAdapter {
                     resultLength = result.length() + 1;
                     result.insert(0, ch);
                     break;
+                } else if (a == 0 && botInfo != null && ch == '/') {
+                    foundType = 2;
+                    resultStartPosition = a;
+                    resultLength = result.length() + 1;
+                    break;
                 }
             }
             if (!(ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_')) {
@@ -145,16 +166,21 @@ public class MentionsAdapter extends BaseSearchAdapter {
             }
             String usernameString = result.toString().toLowerCase();
             ArrayList<TLRPC.User> newResult = new ArrayList<>();
-            for (TLRPC.TL_chatParticipant chatParticipant : info.participants) {
-                TLRPC.User user = MessagesController.getInstance().getUser(chatParticipant.user_id);
-                if (user == null || user instanceof TLRPC.TL_userSelf) {
-                    continue;
-                }
-                if (user.username != null && user.username.length() > 0 && (usernameString.length() > 0 && user.username.toLowerCase().startsWith(usernameString) || usernameString.length() == 0)) {
-                    newResult.add(user);
+            if (info instanceof TLRPC.TL_chatFull) {
+                for (TLRPC.TL_chatParticipant chatParticipant : info.participants.participants) {
+                    TLRPC.User user = MessagesController.getInstance().getUser(chatParticipant.user_id);
+                    if (user == null || UserObject.isUserSelf(user)) {
+                        continue;
+                    }
+                    if (user.username != null && user.username.length() > 0 && (usernameString.length() > 0 && user.username.toLowerCase().startsWith(usernameString) || usernameString.length() == 0)) {
+                        newResult.add(user);
+                    }
                 }
             }
             searchResultHashtags = null;
+            searchResultCommands = null;
+            searchResultCommandsHelp = null;
+            searchResultCommandsUsers = null;
             searchResultUsernames = newResult;
             Collections.sort(searchResultUsernames, new Comparator<TLRPC.User>() {
                 @Override
@@ -173,16 +199,40 @@ public class MentionsAdapter extends BaseSearchAdapter {
             });
             notifyDataSetChanged();
             delegate.needChangePanelVisibility(!newResult.isEmpty());
-        } else {
+        } else if (foundType == 1) {
             ArrayList<String> newResult = new ArrayList<>();
             String hashtagString = result.toString().toLowerCase();
             for (HashtagObject hashtagObject : hashtags) {
-                if (hashtagString != null && hashtagObject.hashtag != null && hashtagObject.hashtag.startsWith(hashtagString)) {
+                if (hashtagObject != null && hashtagObject.hashtag != null && hashtagObject.hashtag.startsWith(hashtagString)) {
                     newResult.add(hashtagObject.hashtag);
                 }
             }
             searchResultHashtags = newResult;
             searchResultUsernames = null;
+            searchResultCommands = null;
+            searchResultCommandsHelp = null;
+            searchResultCommandsUsers = null;
+            notifyDataSetChanged();
+            delegate.needChangePanelVisibility(!newResult.isEmpty());
+        } else if (foundType == 2) {
+            ArrayList<String> newResult = new ArrayList<>();
+            ArrayList<String> newResultHelp = new ArrayList<>();
+            ArrayList<TLRPC.User> newResultUsers = new ArrayList<>();
+            String command = result.toString().toLowerCase();
+            for (HashMap.Entry<Integer, TLRPC.BotInfo> entry : botInfo.entrySet()) {
+                for (TLRPC.TL_botCommand botCommand : entry.getValue().commands) {
+                    if (botCommand != null && botCommand.command != null && botCommand.command.startsWith(command)) {
+                        newResult.add("/" + botCommand.command);
+                        newResultHelp.add(botCommand.description);
+                        newResultUsers.add(MessagesController.getInstance().getUser(entry.getValue().user_id));
+                    }
+                }
+            }
+            searchResultHashtags = null;
+            searchResultUsernames = null;
+            searchResultCommands = newResult;
+            searchResultCommandsHelp = newResultHelp;
+            searchResultCommandsUsers = newResultUsers;
             notifyDataSetChanged();
             delegate.needChangePanelVisibility(!newResult.isEmpty());
         }
@@ -207,6 +257,8 @@ public class MentionsAdapter extends BaseSearchAdapter {
             return searchResultUsernames.size();
         } else if (searchResultHashtags != null) {
             return searchResultHashtags.size();
+        } else if (searchResultCommands != null) {
+            return searchResultCommands.size();
         }
         return 0;
     }
@@ -217,6 +269,8 @@ public class MentionsAdapter extends BaseSearchAdapter {
             return searchResultUsernames.isEmpty();
         } else if (searchResultHashtags != null) {
             return searchResultHashtags.isEmpty();
+        } else if (searchResultCommands != null) {
+            return searchResultCommands.isEmpty();
         }
         return true;
     }
@@ -253,19 +307,38 @@ public class MentionsAdapter extends BaseSearchAdapter {
                 return null;
             }
             return searchResultHashtags.get(i);
+        } else if (searchResultCommands != null) {
+            if (i < 0 || i >= searchResultCommands.size()) {
+                return null;
+            }
+            if (searchResultCommandsUsers != null && botsCount != 1) {
+                return String.format("%s@%s", searchResultCommands.get(i), searchResultCommandsUsers.get(i).username);
+            }
+            return searchResultCommands.get(i);
         }
         return null;
+    }
+
+    public boolean isLongClickEnabled() {
+        return searchResultHashtags != null;
+    }
+
+    public boolean isBotCommands() {
+        return searchResultCommands != null;
     }
 
     @Override
     public View getView(int i, View view, ViewGroup viewGroup) {
         if (view == null) {
             view = new MentionCell(mContext);
+            ((MentionCell) view).setIsDarkTheme(isDarkTheme);
         }
         if (searchResultUsernames != null) {
             ((MentionCell) view).setUser(searchResultUsernames.get(i));
         } else if (searchResultHashtags != null) {
             ((MentionCell) view).setText(searchResultHashtags.get(i));
+        }  else if (searchResultCommands != null) {
+            ((MentionCell) view).setBotCommand(searchResultCommands.get(i), searchResultCommandsHelp.get(i), searchResultCommandsUsers.get(i));
         }
         return view;
     }

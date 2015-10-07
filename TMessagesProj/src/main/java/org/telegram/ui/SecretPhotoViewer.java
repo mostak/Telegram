@@ -29,16 +29,17 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
-import org.telegram.android.AndroidUtilities;
-import org.telegram.android.ImageLoader;
-import org.telegram.android.ImageReceiver;
-import org.telegram.android.MessageObject;
-import org.telegram.android.NotificationCenter;
-import org.telegram.messenger.ConnectionsManager;
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ImageLoader;
+import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
-import org.telegram.messenger.TLRPC;
+import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.Components.LayoutHelper;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -54,18 +55,6 @@ public class SecretPhotoViewer implements NotificationCenter.NotificationCenterD
         @Override
         protected void onDraw(Canvas canvas) {
             getInstance().onDraw(canvas);
-        }
-    }
-
-    private class FrameLayoutTouchListener extends FrameLayout {
-        public FrameLayoutTouchListener(Context context) {
-            super(context);
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            FileLog.e("tmessages", event.toString());
-            return super.onTouchEvent(event);
         }
     }
 
@@ -146,7 +135,7 @@ public class SecretPhotoViewer implements NotificationCenter.NotificationCenterD
 
     private Activity parentActivity;
     private WindowManager.LayoutParams windowLayoutParams;
-    private FrameLayoutTouchListener windowView;
+    private FrameLayout windowView;
     private FrameLayoutDrawer containerView;
     private ImageReceiver centerImage = new ImageReceiver();
     private SecretDeleteTimer secretDeleteTimer;
@@ -173,6 +162,10 @@ public class SecretPhotoViewer implements NotificationCenter.NotificationCenterD
     public void didReceivedNotification(int id, Object... args) {
         if (id == NotificationCenter.messagesDeleted) {
             if (currentMessageObject == null) {
+                return;
+            }
+            int channelId = (Integer) args[1];
+            if (channelId != 0) {
                 return;
             }
             ArrayList<Integer> markAsDeletedMessages = (ArrayList<Integer>)args[0];
@@ -204,7 +197,7 @@ public class SecretPhotoViewer implements NotificationCenter.NotificationCenterD
         }
         parentActivity = activity;
 
-        windowView = new FrameLayoutTouchListener(activity);
+        windowView = new FrameLayout(activity);
         windowView.setBackgroundColor(0xff000000);
         windowView.setFocusable(true);
         windowView.setFocusableInTouchMode(true);
@@ -213,8 +206,8 @@ public class SecretPhotoViewer implements NotificationCenter.NotificationCenterD
         containerView.setFocusable(false);
         windowView.addView(containerView);
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams)containerView.getLayoutParams();
-        layoutParams.width = FrameLayout.LayoutParams.MATCH_PARENT;
-        layoutParams.height = FrameLayout.LayoutParams.MATCH_PARENT;
+        layoutParams.width = LayoutHelper.MATCH_PARENT;
+        layoutParams.height = LayoutHelper.MATCH_PARENT;
         layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
         containerView.setLayoutParams(layoutParams);
         containerView.setOnTouchListener(new View.OnTouchListener() {
@@ -264,7 +257,7 @@ public class SecretPhotoViewer implements NotificationCenter.NotificationCenterD
         BitmapDrawable drawable = ImageLoader.getInstance().getImageFromMemory(sizeFull.location, null, null);
         if (drawable == null) {
             File file = FileLoader.getPathToAttach(sizeFull);
-            Bitmap bitmap = null;
+            Bitmap bitmap;
             try {
                 bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
             } catch (Throwable e) {
@@ -279,7 +272,7 @@ public class SecretPhotoViewer implements NotificationCenter.NotificationCenterD
         if (drawable != null) {
             centerImage.setImageBitmap(drawable);
         } else {
-            centerImage.setImage(sizeFull.location, null, null, size, false);
+            centerImage.setImage(sizeFull.location, null, null, size, null, false);
         }
 
         currentMessageObject = messageObject;

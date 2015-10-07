@@ -1,9 +1,9 @@
 /*
- * This is the source code of Telegram for Android v. 1.3.2.
+ * This is the source code of Telegram for Android v. 2.x.x.
  * It is licensed under GNU GPL v. 2 or later.
  * You should have received a copy of the license in this archive (see LICENSE).
  *
- * Copyright Nikolai Kudashov, 2013.
+ * Copyright Nikolai Kudashov, 2013-2015.
  */
 
 package org.telegram.messenger;
@@ -18,7 +18,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -26,23 +25,19 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Handler;
 import android.os.PowerManager;
+import android.util.Base64;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
-import org.telegram.android.AndroidUtilities;
-import org.telegram.android.ContactsController;
-import org.telegram.android.MediaController;
-import org.telegram.android.NotificationsService;
-import org.telegram.android.SendMessagesHelper;
-import org.telegram.android.LocaleController;
-import org.telegram.android.MessagesController;
-import org.telegram.android.NativeLoader;
-import org.telegram.android.ScreenReceiver;
+import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.SerializedData;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.ForegroundDetector;
 
 import java.io.File;
+import java.io.RandomAccessFile;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ApplicationLoader extends Application {
@@ -92,7 +87,6 @@ public class ApplicationLoader extends Application {
                         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
                         int selectedBackground = preferences.getInt("selectedBackground", 1000001);
                         selectedColor = preferences.getInt("selectedColor", 0);
-                        int cacheColorHint = 0;
                         if (selectedColor == 0) {
                             if (selectedBackground == 1000001) {
                                 cachedWallpaper = applicationContext.getResources().getDrawable(R.drawable.background_hd);
@@ -128,12 +122,56 @@ public class ApplicationLoader extends Application {
         }
     }
 
+    private static void convertConfig() {
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("dataconfig", Context.MODE_PRIVATE);
+        if (preferences.contains("currentDatacenterId")) {
+            SerializedData buffer = new SerializedData(32 * 1024);
+            buffer.writeInt32(2);
+            buffer.writeBool(preferences.getInt("datacenterSetId", 0) != 0);
+            buffer.writeBool(true);
+            buffer.writeInt32(preferences.getInt("currentDatacenterId", 0));
+            buffer.writeInt32(preferences.getInt("timeDifference", 0));
+            buffer.writeInt32(preferences.getInt("lastDcUpdateTime", 0));
+            buffer.writeInt64(preferences.getLong("pushSessionId", 0));
+            buffer.writeBool(false);
+            buffer.writeInt32(0);
+            try {
+                String datacentersString = preferences.getString("datacenters", null);
+                if (datacentersString != null) {
+                    byte[] datacentersBytes = Base64.decode(datacentersString, Base64.DEFAULT);
+                    if (datacentersBytes != null) {
+                        SerializedData data = new SerializedData(datacentersBytes);
+                        buffer.writeInt32(data.readInt32(false));
+                        buffer.writeBytes(datacentersBytes, 4, datacentersBytes.length - 4);
+                        data.cleanup();
+                    }
+                }
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+
+            try {
+                File file = new File(ApplicationLoader.applicationContext.getFilesDir(), "tgnet.dat");
+                RandomAccessFile fileOutputStream = new RandomAccessFile(file, "rws");
+                byte[] bytes = buffer.toByteArray();
+                fileOutputStream.writeInt(Integer.reverseBytes(bytes.length));
+                fileOutputStream.write(bytes);
+                fileOutputStream.close();
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+            buffer.cleanup();
+            preferences.edit().clear().commit();
+        }
+    }
+
     public static void postInitApplication() {
         if (applicationInited) {
             return;
         }
 
         applicationInited = true;
+        convertConfig();
 
         try {
             LocaleController.getInstance();
@@ -159,10 +197,42 @@ public class ApplicationLoader extends Application {
         }
 
         UserConfig.loadConfig();
+        String deviceModel;
+        String langCode;
+        String appVersion;
+        String systemVersion;
+        String configPath = ApplicationLoader.applicationContext.getFilesDir().toString();
+
+        try {
+            langCode = LocaleController.getLocaleString(LocaleController.getInstance().getSystemDefaultLocale());
+            deviceModel = Build.MANUFACTURER + Build.MODEL;
+            PackageInfo pInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+            appVersion = pInfo.versionName + " (" + pInfo.versionCode + ")";
+            systemVersion = "SDK " + Build.VERSION.SDK_INT;
+        } catch (Exception e) {
+            langCode = "en";
+            deviceModel = "Android unknown";
+            appVersion = "App version unknown";
+            systemVersion = "SDK " + Build.VERSION.SDK_INT;
+        }
+        if (langCode.length() == 0) {
+            langCode = "en";
+        }
+        if (deviceModel.length() == 0) {
+            deviceModel = "Android unknown";
+        }
+        if (appVersion.length() == 0) {
+            appVersion = "App version unknown";
+        }
+        if (systemVersion.length() == 0) {
+            systemVersion = "SDK Unknown";
+        }
+
+        MessagesController.getInstance();
+        ConnectionsManager.getInstance().init(BuildVars.BUILD_VERSION, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, langCode, configPath, UserConfig.getClientUserId());
         if (UserConfig.getCurrentUser() != null) {
             MessagesController.getInstance().putUser(UserConfig.getCurrentUser(), true);
             ConnectionsManager.getInstance().applyCountryPortNumber(UserConfig.getCurrentUser().phone);
-            ConnectionsManager.getInstance().initPushConnection();
             MessagesController.getInstance().getBlockedUsers(true);
             SendMessagesHelper.getInstance().checkUnsentMessages();
         }
@@ -186,6 +256,7 @@ public class ApplicationLoader extends Application {
 
         applicationContext = getApplicationContext();
         NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
+        ConnectionsManager.native_setJava(Build.VERSION.SDK_INT == 14 || Build.VERSION.SDK_INT == 15);
 
         if (Build.VERSION.SDK_INT >= 14) {
             new ForegroundDetector(this);
@@ -273,8 +344,7 @@ public class ApplicationLoader extends Application {
             return "";
         }
         int registeredVersion = prefs.getInt(PROPERTY_APP_VERSION, Integer.MIN_VALUE);
-        int currentVersion = getAppVersion();
-        if (registeredVersion != currentVersion) {
+        if (registeredVersion != BuildVars.BUILD_VERSION) {
             FileLog.d("tmessages", "App version changed.");
             return "";
         }
@@ -283,15 +353,6 @@ public class ApplicationLoader extends Application {
 
     private SharedPreferences getGCMPreferences(Context context) {
         return getSharedPreferences(ApplicationLoader.class.getSimpleName(), Context.MODE_PRIVATE);
-    }
-
-    public static int getAppVersion() {
-        try {
-            PackageInfo packageInfo = applicationContext.getPackageManager().getPackageInfo(applicationContext.getPackageName(), 0);
-            return packageInfo.versionCode;
-        } catch (PackageManager.NameNotFoundException e) {
-            throw new RuntimeException("Could not get package name: " + e);
-        }
     }
 
     private void registerInBackground() {
@@ -354,7 +415,7 @@ public class ApplicationLoader extends Application {
 
     private void storeRegistrationId(Context context, String regId) {
         final SharedPreferences prefs = getGCMPreferences(context);
-        int appVersion = getAppVersion();
+        int appVersion = BuildVars.BUILD_VERSION;
         FileLog.e("tmessages", "Saving regId on app version " + appVersion);
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString(PROPERTY_REG_ID, regId);
